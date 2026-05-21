@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { rentals, products } from "@/db/schema";
+import { orders, orderItems, resources } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sendRentalReminder } from "@/lib/line";
 
@@ -31,17 +31,18 @@ export async function GET(req: NextRequest) {
     // 2. 租期(tstzrange)的結束日 (upper bound) 落在今天或明天內
     const activeRentals = await db
       .select({
-        id: rentals.id,
-        customerName: rentals.customerName,
-        rentalPeriod: rentals.rentalPeriod,
-        productName: products.name,
+        id: orders.id,
+        customerName: orders.customerName,
+        rentalPeriod: orders.reservationPeriod,
+        productName: resources.name,
       })
-      .from(rentals)
-      .innerJoin(products, eq(rentals.productId, products.id))
+      .from(orders)
+      .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+      .innerJoin(resources, eq(orderItems.resourceId, resources.id))
       .where(
         and(
-          eq(rentals.status, "PICKED_UP"),
-          sql`upper(${rentals.rentalPeriod}) >= current_date AND upper(${rentals.rentalPeriod}) < current_date + interval '2 days'`
+          eq(orders.status, "PICKED_UP"),
+          sql`upper(${orders.reservationPeriod}) >= current_date AND upper(${orders.reservationPeriod}) < current_date + interval '2 days'`
         )
       );
 

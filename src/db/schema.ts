@@ -14,7 +14,7 @@ import { sql } from "drizzle-orm";
 
 export const businessModeEnum = pgEnum("business_mode", ["RENTAL", "RESTAURANT", "RETAIL", "CLASSROOM"]);
 
-export const resourceTypeEnum = pgEnum("resource_type", ["EQUIPMENT", "TABLE", "MENU_ITEM", "CLASS_SEAT"]);
+export const resourceTypeEnum = pgEnum("resource_type", ["EQUIPMENT", "TABLE", "MENU_ITEM", "CLASS_SEAT", "SALES", "RENTAL"]);
 
 export const orderStatusEnum = pgEnum("order_status", [
   "PENDING",

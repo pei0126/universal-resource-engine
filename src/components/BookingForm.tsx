@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createRental, getBookedPeriods } from "@/app/actions";
-import { useRouter, useSearchParams } from "next/navigation";
+import { getBookedPeriods } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/store/useCart";
+import { toast } from "sonner";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { differenceInHours, addDays, isSameDay, format, addHours, eachDayOfInterval } from "date-fns";
@@ -19,19 +21,18 @@ export default function BookingForm({
   tenantId,
   basePrice,
   deposit,
+  productName,
+  imageUrl,
 }: {
   productId: string;
   tenantId: string;
   basePrice: number;
   deposit: number;
+  productName: string;
+  imageUrl?: string | null;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const lineUserId = searchParams.get("lineUserId") || "";
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const addItem = useCart(state => state.addItem);
 
   // 拆分日期與時間狀態，徹底解決手機端 TimePicker 跑版問題
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -72,60 +73,28 @@ export default function BookingForm({
   const finalStart = getCombinedDate(startDate, startTime);
   const finalEnd = getCombinedDate(endDate, endTime);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (!finalStart || !finalEnd) {
-      setError("請完整選擇取件與歸還的日期和時間");
-      setLoading(false);
-      return;
-    }
-
-    if (finalEnd <= finalStart) {
-      setError("歸還時間必須晚於取件時間");
-      setLoading(false);
-      return;
-    }
-
-    const formData = new FormData(e.currentTarget);
-    const customerName = (formData.get("customerName") as string) || "";
-
+  const handleAddToCart = () => {
+    if (!finalStart || !finalEnd) return;
+    
     const hours = Math.max(0, differenceInHours(finalEnd, finalStart));
     const days = Math.max(1, Math.ceil(hours / 24));
-    const finalTotalPrice = days * basePrice + deposit;
-
-    const result = await createRental({
-      tenantId,
-      equipmentId: productId, 
-      customerName,
-      lineUserId,
-      from: finalStart.toISOString(),
-      to: finalEnd.toISOString(),
-      totalPrice: finalTotalPrice,
+    
+    addItem({
+      id: productId,
+      name: productName,
+      price: basePrice * days, // 租賃價格直接依據天數計算單價
+      quantity: 1,
+      imageUrl: imageUrl,
+      tenantId: tenantId,
+      resourceType: "RENTAL",
+      startDate: finalStart.toISOString(),
+      endDate: finalEnd.toISOString(),
     });
 
-    if (result.success) {
-      setSuccess(true);
-      router.refresh();
-    } else {
-      setError(result.error || "未知錯誤");
-    }
-    setLoading(false);
-  }
-
-  if (success) {
-    return (
-      <div className="bg-emerald-50 border border-emerald-200 p-8 rounded-2xl text-center shadow-lg">
-        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">✓</div>
-        <h3 className="text-3xl font-black text-emerald-800 mb-4">預約大成功！</h3>
-        <p className="text-emerald-700 font-medium text-lg leading-relaxed">
-          設備已經為您預留。<br/>系統已透過 LINE 發送詳細憑證給您。
-        </p>
-      </div>
-    );
-  }
+    toast.success("已加入購物車", {
+      description: `${productName} 已成功加入您的購物車！`,
+    });
+  };
 
   let uiDays = 0;
   let uiRentTotal = 0;
@@ -145,17 +114,11 @@ export default function BookingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-8 bg-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-gray-100">
+    <div className="flex flex-col gap-8 bg-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-gray-100">
       <div className="border-b-2 border-gray-100 pb-4">
         <h3 className="text-3xl font-black text-gray-900 tracking-tight">精準檔期預約</h3>
         <p className="text-gray-500 mt-2 font-medium">請分開選擇日期與精準時間，不再受限傳統日曆</p>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg font-bold text-lg">
-          {error}
-        </div>
-      )}
 
       {/* 取貨時間選擇區（Mobile-First 設計：日期按鈕 + 下拉選單） */}
       <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 space-y-4">
@@ -176,9 +139,10 @@ export default function BookingForm({
               dateFormat="yyyy-MM-dd"
               minDate={new Date()}
               excludeDates={bookedDates}
-              className="w-full bg-white border-2 border-blue-200 rounded-xl px-5 py-4 font-bold text-gray-900 text-lg shadow-sm focus:border-blue-500 outline-none w-full"
+              className="w-full bg-white border-2 border-blue-200 rounded-xl px-5 py-4 font-bold text-gray-900 text-lg shadow-sm focus:border-blue-500 outline-none"
               placeholderText="點選日期"
-              withPortal
+              popperPlacement="bottom-start"
+              calendarClassName="w-[280px] shadow-2xl border-none rounded-2xl bg-white"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -210,9 +174,10 @@ export default function BookingForm({
               dateFormat="yyyy-MM-dd"
               minDate={startDate || new Date()}
               excludeDates={bookedDates}
-              className="w-full bg-white border-2 border-purple-200 rounded-xl px-5 py-4 font-bold text-gray-900 text-lg shadow-sm focus:border-purple-500 outline-none w-full"
+              className="w-full bg-white border-2 border-purple-200 rounded-xl px-5 py-4 font-bold text-gray-900 text-lg shadow-sm focus:border-purple-500 outline-none"
               placeholderText="點選日期"
-              withPortal
+              popperPlacement="bottom-start"
+              calendarClassName="w-[280px] shadow-2xl border-none rounded-2xl bg-white"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -238,17 +203,7 @@ export default function BookingForm({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 pt-2">
-        <label className="font-bold text-gray-700 text-lg">聯絡人真實大名</label>
-        <input
-          name="customerName"
-          type="text"
-          required
-          className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none transition-all font-bold text-lg text-gray-900"
-          placeholder="取件核對身分證使用"
-        />
-        <input type="hidden" name="lineUserId" value={lineUserId} />
-      </div>
+
 
       {finalStart && finalEnd && (finalEnd > finalStart) && !hasOverlap && (
         <div className="bg-gray-900 rounded-2xl p-6 shadow-2xl text-white my-2 transform transition-all">
@@ -279,15 +234,18 @@ export default function BookingForm({
       )}
 
       <button
-        type="submit"
-        disabled={loading || !finalStart || !finalEnd || finalEnd <= finalStart || hasOverlap}
-        className={`w-full py-5 rounded-2xl text-xl font-black text-white shadow-xl transition-all ${
-          loading || !finalStart || !finalEnd || finalEnd <= finalStart || hasOverlap
+        onClick={handleAddToCart}
+        disabled={!finalStart || !finalEnd || finalEnd <= finalStart || hasOverlap}
+        className={`w-full py-5 rounded-2xl text-xl font-black text-white shadow-xl transition-all flex items-center justify-center gap-3 ${
+          !finalStart || !finalEnd || finalEnd <= finalStart || hasOverlap
             ? "bg-gray-300 cursor-not-allowed shadow-none text-gray-500"
-            : "bg-blue-600 hover:bg-blue-500 hover:scale-[1.02] hover:shadow-blue-500/50 active:scale-95"
+            : "bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 hover:shadow-blue-500/50"
         }`}
       >
-        {loading ? "計算演算中..." : hasOverlap ? "此時段已被其他客人搶先" : (!finalStart || !finalEnd ? "請完成日期與時間選擇" : (finalEnd <= finalStart ? "時間不合理" : "立即鎖定預約"))}
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        {hasOverlap ? "此時段已被其他客人搶先" : (!finalStart || !finalEnd ? "請完成日期與時間選擇" : (finalEnd <= finalStart ? "時間不合理" : "加入購物車"))}
       </button>
 
       {/* 覆蓋 react-datepicker 基本容器樣式，讓他變寬變大 */}
@@ -296,12 +254,19 @@ export default function BookingForm({
         .react-datepicker__input-container {
           display: block;
           width: 100%;
+          max-width: 100%;
+        }
+        .react-datepicker-popper {
+          z-index: 50 !important;
+          padding-top: 4px !important;
         }
         .react-datepicker {
           border: none !important;
           border-radius: 1rem !important;
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
           font-family: inherit !important;
+          background-color: white !important;
+          display: inline-block !important;
         }
         .react-datepicker__header {
           background-color: white !important;
@@ -337,6 +302,6 @@ export default function BookingForm({
           background-size: 1.5em 1.5em;
         }
       `}</style>
-    </form>
+    </div>
   );
 }

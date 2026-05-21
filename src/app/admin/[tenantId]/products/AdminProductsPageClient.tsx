@@ -35,15 +35,24 @@ export default function AdminProductsPageClient({
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">商家後台 - 商品管理</h1>
-          <button
-            onClick={handleCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            新增商品
-          </button>
+          <div className="flex gap-3">
+            <a
+              href={`/products?tenantId=${tenantId}`}
+              target="_blank"
+              className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+            >
+              查看我的商店
+            </a>
+            <button
+              onClick={handleCreate}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              新增商品
+            </button>
+          </div>
         </div>
 
         <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-200">
@@ -153,7 +162,11 @@ export default function AdminProductsPageClient({
       {isModalOpen && (
         <ProductFormModal
           tenantId={tenantId}
-          initialData={editingProduct}
+          initialData={editingProduct ? {
+            ...editingProduct,
+            type: editingProduct.resourceType,
+            dailyPrice: editingProduct.price
+          } : undefined}
           onClose={() => setIsModalOpen(false)}
         />
       )}

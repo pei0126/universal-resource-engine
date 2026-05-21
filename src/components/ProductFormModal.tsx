@@ -6,7 +6,7 @@ import { upsertProduct } from "@/app/actions";
 type Product = {
   id?: string;
   name: string;
-  type: "SALE" | "RENTAL";
+  type: "SALES" | "RENTAL" | "EQUIPMENT";
   dailyPrice: string;
   deposit: string | null;
   totalStock: number;
@@ -24,6 +24,8 @@ export default function ProductFormModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [productType, setProductType] = useState<"SALES" | "RENTAL">((initialData?.type === "SALES" || initialData?.type === "RENTAL") ? initialData.type : "RENTAL");
   
   // 圖片預覽
   const [imagePreview, setImagePreview] = useState<string | null>(
@@ -141,6 +143,20 @@ export default function ProductFormModal({
             </div>
 
             <div className="space-y-4 pt-4 border-t border-gray-100">
+              {/* 商品類型 */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">商品類型 <span className="text-red-500">*</span></label>
+                <select
+                  name="type"
+                  value={productType}
+                  onChange={(e) => setProductType(e.target.value as "SALES" | "RENTAL")}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none bg-white"
+                >
+                  <option value="RENTAL">租賃 (Rental)</option>
+                  <option value="SALES">買斷 (Sale)</option>
+                </select>
+              </div>
+
               {/* 基本資訊 */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">商品名稱 <span className="text-red-500">*</span></label>
@@ -156,7 +172,7 @@ export default function ProductFormModal({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">單日租金 <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">{productType === "SALES" ? "售價" : "單日租金"} <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-gray-500">$</span>
                     <input
@@ -172,22 +188,24 @@ export default function ProductFormModal({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">設備押金 <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
-                    <input
-                      type="number"
-                      name="deposit"
-                      defaultValue={initialData?.deposit || ""}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                      placeholder="0.00"
-                    />
+                {productType !== "SALES" && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">設備押金 <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        name="deposit"
+                        defaultValue={initialData?.deposit || ""}
+                        required
+                        min="0"
+                        step="0.01"
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div>

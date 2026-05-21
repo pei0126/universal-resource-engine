@@ -194,14 +194,20 @@ export async function createPurchase(data: {
     const now = new Date().toISOString();
     const dummyRange = `[${now}, ${now}]`;
 
-    const insertResult = await db.insert(rentals).values({
+    const insertResult = await db.insert(orders).values({
       tenantId: data.tenantId,
-      productId: data.productId,
       customerName: data.customerName,
-      rentalPeriod: sql`${dummyRange}::tstzrange`,
+      reservationPeriod: sql`${dummyRange}::tstzrange`,
       totalPrice: data.totalPrice.toString(),
       status: "ACTIVE", // 買斷視為已啟動/完成
-    }).returning({ id: rentals.id });
+    }).returning({ id: orders.id });
+
+    await db.insert(orderItems).values({
+      orderId: insertResult[0].id,
+      resourceId: data.productId,
+      quantity: 1,
+      priceAtTime: data.totalPrice.toString(),
+    });
 
     try {
       const receiptData: LineReceiptData = {
@@ -227,20 +233,115 @@ export async function createPurchase(data: {
   }
 }
 
+export async function checkoutCart(data: {
+  tenantId: string;
+  customerName: string;
+  phone: string;
+  shippingMethod: string;
+  paymentMethod: string;
+  shippingAddress?: string;
+  cart: { id: string; name: string; price: number; quantity: number; startDate?: string; endDate?: string; resourceType?: string; }[];
+}) {
+  try {
+    if (!data.cart || data.cart.length === 0) return { success: false, error: "購物車為空" };
+
+    // 根據起訖日期進行群組化。因為 orders 資料表的 reservationPeriod 是單一欄位。
+    // 如果購物車同時包含買斷(無日期)與多個不同檔期的租賃，必須拆分成多筆主訂單。
+    const groups: Record<string, typeof data.cart> = {};
+    for (const item of data.cart) {
+      const key = `${item.startDate || 'none'}_${item.endDate || 'none'}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    }
+
+    const orderIds: string[] = [];
+    const allLineItems: any[] = [];
+    let grandTotal = 0;
+
+    for (const [key, items] of Object.entries(groups)) {
+      const groupTotalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      grandTotal += groupTotalPrice;
+
+      let reservationPeriod = null;
+      let status = "ACTIVE"; // 買斷預設 ACTIVE
+
+      // 如果有日期，則轉換成 tstzrange 格式，且狀態預設為 PENDING（租賃預約）
+      if (key !== 'none_none') {
+        const [start, end] = key.split('_');
+        reservationPeriod = sql`[${start}, ${end}]::tstzrange`;
+        status = "PENDING";
+      }
+
+      const insertResult = await db.insert(orders).values({
+        tenantId: data.tenantId,
+        customerName: data.customerName,
+        reservationPeriod: reservationPeriod,
+        totalPrice: groupTotalPrice.toString(),
+        status: status as any,
+        metadata: {
+          phone: data.phone,
+          shippingMethod: data.shippingMethod,
+          paymentMethod: data.paymentMethod,
+          shippingAddress: data.shippingAddress || null,
+          isCartCheckout: true,
+        },
+      }).returning({ id: orders.id });
+
+      const orderId = insertResult[0].id;
+      orderIds.push(orderId);
+
+      for (const item of items) {
+        await db.insert(orderItems).values({
+          orderId: orderId,
+          resourceId: item.id,
+          quantity: item.quantity,
+          priceAtTime: item.price.toString(),
+        });
+
+        allLineItems.push({
+          name: item.name + (item.startDate ? ` (${item.startDate.split('T')[0]}~${item.endDate?.split('T')[0]})` : ""),
+          qty: item.quantity,
+          price: item.price,
+          type: item.resourceType === "RENTAL" ? "RENTAL" : "SALE"
+        });
+      }
+    }
+
+    try {
+      const receiptData: LineReceiptData = {
+        orderId: orderIds[0], // 若有多筆，此處僅取第一筆代表
+        customerName: data.customerName,
+        source: "線上顧客購買",
+        totalPrice: grandTotal,
+        items: allLineItems
+      };
+      await sendLineReceipt(receiptData);
+    } catch(e) { console.warn("LINE 發送失敗", e) }
+
+    return { success: true };
+  } catch (err) {
+    console.error("checkoutCart Error:", err);
+    return { success: false, error: "系統發生未知錯誤，請稍後再試" };
+  }
+}
+
 export async function getBookedPeriods(productId: string) {
   const result = await db
-    .select({ rentalPeriod: rentals.rentalPeriod })
-    .from(rentals)
+    .select({ rentalPeriod: orders.reservationPeriod })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .where(
       and(
-        eq(rentals.productId, productId),
-        ne(rentals.status, "CANCELLED")
+        eq(orderItems.resourceId, productId),
+        ne(orders.status, "CANCELLED"),
+        ne(orders.status, "RETURNED")
       )
     );
 
   const periods: { start: Date; end: Date }[] = [];
 
   for (const row of result) {
+    if (!row.rentalPeriod) continue;
     // rentalPeriod 來自 postgres 是字串，如 "[2024-03-20 10:00:00+08, 2024-03-25 10:00:00+08)"
     const periodStr = String(row.rentalPeriod);
     const match = periodStr.match(/\[(.*?),\s*(.*?)\)/);
@@ -366,9 +467,11 @@ export async function upsertProduct(tenantId: string, formData: FormData) {
       imageUrl = publicUrl;
     }
 
+    const type = formData.get("type") as "SALES" | "RENTAL" | null;
+
     const payload = {
       tenantId: tenantId,
-      resourceType: "EQUIPMENT" as any,
+      resourceType: (type || "RENTAL") as any,
       name: name,
       price: dailyPrice.toString(),
       deposit: deposit ? Number(deposit).toString() : null,

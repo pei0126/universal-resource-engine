@@ -19,10 +19,10 @@ export default function Home() {
         </p>
         
         <div className="flex gap-4 mb-16">
-          <Link href="/products" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center gap-2">
+          <Link href={`/products?tenantId=${process.env.NEXT_PUBLIC_TEST_TENANT_ID || "11111111-1111-1111-1111-111111111111"}`} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center gap-2">
             前往商品大廳 <ArrowRight className="w-5 h-5" />
           </Link>
-          <Link href={`/admin/${process.env.NEXT_PUBLIC_TEST_TENANT_ID}/pos`} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 px-8 py-4 rounded-full font-bold text-lg transition-all shadow-sm flex items-center gap-2">
+          <Link href={`/admin/${process.env.NEXT_PUBLIC_TEST_TENANT_ID || "11111111-1111-1111-1111-111111111111"}/pos`} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 px-8 py-4 rounded-full font-bold text-lg transition-all shadow-sm flex items-center gap-2">
             商家控制台
           </Link>
         </div>

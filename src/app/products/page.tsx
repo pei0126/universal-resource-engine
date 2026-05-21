@@ -1,27 +1,25 @@
 import { getProducts } from "@/app/actions";
 import Link from "next/link";
 
-// 測試用 Tenant ID (來自 .env)
-const TENANT_ID = process.env.NEXT_PUBLIC_TEST_TENANT_ID!;
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenantId?: string }>;
+}) {
+  const params = await searchParams;
+  let tenantId = params?.tenantId;
 
-export default async function ProductsPage() {
-  if (!TENANT_ID) {
-    return (
-      <main style={styles.container}>
-        <h1 style={styles.error}>
-          請先在 .env.local 設定 NEXT_PUBLIC_TEST_TENANT_ID
-        </h1>
-      </main>
-    );
+  if (!tenantId) {
+    tenantId = process.env.NEXT_PUBLIC_TEST_TENANT_ID || "11111111-1111-1111-1111-111111111111";
   }
 
   // 1. 強制帶入 tenant_id 讀取商店專屬產品
-  const products = await getProducts(TENANT_ID);
+  const products = await getProducts(tenantId);
 
   return (
     <main style={styles.container}>
       <h1 style={styles.title}>🛍️ 商店產品列表</h1>
-      <p style={styles.subtitle}>Tenant ID: {TENANT_ID}</p>
+      <p style={styles.subtitle}>Tenant ID: {tenantId}</p>
 
       {products.length === 0 ? (
         <p style={{ color: "#666" }}>
@@ -31,7 +29,7 @@ export default async function ProductsPage() {
         <div style={styles.grid}>
           {products.map((product) => (
             <Link
-              href={`/products/${product.id}`}
+              href={`/products/${product.id}?tenantId=${tenantId}`}
               key={product.id}
               style={styles.card}
             >
@@ -42,7 +40,7 @@ export default async function ProductsPage() {
               </div>
               <h2 style={styles.productName}>{product.name}</h2>
               <div style={styles.priceContainer}>
-                <span style={styles.price}>${product.dailyPrice}</span>
+                <span style={styles.price}>${product.price}</span>
                 {product.deposit && (
                   <span style={styles.deposit}>
                     (押金: ${product.deposit})

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { db } from "@/db";
-import { rentals, products } from "@/db/schema";
+import { orders, orderItems, resources } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,16 +14,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     try {
       const [dbOrder] = await db
         .select({
-          id: rentals.id,
-          customerName: rentals.customerName,
-          status: rentals.status,
-          tenantId: rentals.tenantId,
-          productName: products.name,
-          pickedUpAt: rentals.pickedUpAt
+          id: orders.id,
+          customerName: orders.customerName,
+          status: orders.status,
+          tenantId: orders.tenantId,
+          productName: resources.name,
+          pickedUpAt: orders.pickedUpAt
         })
-        .from(rentals)
-        .innerJoin(products, eq(rentals.productId, products.id))
-        .where(eq(rentals.id, id))
+        .from(orders)
+        .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+        .innerJoin(resources, eq(orderItems.resourceId, resources.id))
+        .where(eq(orders.id, id))
         .limit(1);
       orderData = dbOrder;
     } catch(e) {}

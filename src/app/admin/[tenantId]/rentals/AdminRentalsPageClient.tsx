@@ -279,19 +279,28 @@ export default function AdminRentalsPageClient({
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">商家後台 - 租賃訂單管理</h1>
-          <div className="flex bg-gray-200 p-1 rounded-lg">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-4 py-2 text-sm font-bold rounded-md transition ${viewMode === "table" ? "bg-white text-gray-900 shadow" : "text-gray-500 hover:text-gray-700"}`}
+          <div className="flex gap-4 items-center">
+            <a
+              href={`/products?tenantId=${tenantId}`}
+              target="_blank"
+              className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
             >
-              表格檢視
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-4 py-2 text-sm font-bold rounded-md transition ${viewMode === "calendar" ? "bg-white text-gray-900 shadow" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              日曆檢視
-            </button>
+              查看我的商店
+            </a>
+            <div className="flex bg-gray-200 p-1 rounded-lg">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`px-4 py-2 text-sm font-bold rounded-md transition ${viewMode === "table" ? "bg-white text-gray-900 shadow" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                表格檢視
+              </button>
+              <button
+                onClick={() => setViewMode("calendar")}
+                className={`px-4 py-2 text-sm font-bold rounded-md transition ${viewMode === "calendar" ? "bg-white text-gray-900 shadow" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                日曆檢視
+              </button>
+            </div>
           </div>
         </div>
 
